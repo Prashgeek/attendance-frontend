@@ -1,6 +1,17 @@
-import "./App.css";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+// src/App.jsx
 import React, { useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import "./App.css";
+
+// ====================== Auth ======================
+import Login from "./pages/auth/Login";
+
+// ====================== Admin Imports ======================
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminReports from "./pages/admin/AdminReports";
+import AdminSettings from "./pages/admin/AdminSettings";
 
 // ====================== Student Imports ======================
 import StudentLayout from "./layout/Student/StudentLayout";
@@ -16,6 +27,10 @@ import MarkAttendance from "./pages/Teacher/Teacher_components/MarkAttendance";
 import MyClasses from "./pages/Teacher/Teacher_components/MyClasses";
 import History from "./pages/Teacher/Teacher_components/History";
 
+// ====================== Protected Route ======================
+import ProtectedRoute from "./components/ProtectedRoute";
+
+// ====================== Layout for Teacher ======================
 function TeacherLayout() {
   const [activeTab, setActiveTab] = useState("Mark Attendance");
 
@@ -33,33 +48,54 @@ function TeacherLayout() {
   );
 }
 
-function App() {
+// ====================== Main App ======================
+export default function App() {
   return (
-    <>
-      <BrowserRouter>
-        <Routes>
+    <BrowserRouter>
+      <Routes>
+        {/* ---------------- PUBLIC ROUTE ---------------- */}
+        <Route path="/" element={<Login />} />
 
-          {/* ====================== Student Routes ====================== */}
-          <Route path="student">
-            <Route index element={<>Not Found</>} />
-            <Route element={<StudentLayout />}>
-              <Route path="overview" element={<Overview />} />
-              <Route path="checkin-checkout" element={<CheckInCheckOut />} />
-              <Route path="qrscan" element={<QrScan />} />
-              <Route path="attendance" element={<Attendance />} />
-            </Route>
+        {/* ---------------- ADMIN ROUTES ---------------- */}
+        <Route element={<ProtectedRoute requiredRole="admin" />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="dashboard" element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="reports" element={<AdminReports />} />
+            <Route path="settings" element={<AdminSettings />} />
           </Route>
+        </Route>
 
-          {/* ====================== Teacher Routes ====================== */}
-          <Route path="teacher" element={<TeacherLayout />} />
+        {/* ---------------- TEACHER ROUTES ---------------- */}
+        <Route
+          path="/teacher"
+          element={
+            <ProtectedRoute requiredRole="teacher">
+              <TeacherLayout />
+            </ProtectedRoute>
+          }
+        />
 
-          {/* ====================== Admin Routes (Future) ====================== */}
-          <Route path="*" element={<>404 - Page Not Found</>} />
+        {/* ---------------- STUDENT ROUTES ---------------- */}
+        <Route
+          path="/student"
+          element={
+            <ProtectedRoute requiredRole="student">
+              <StudentLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Overview />} />
+          <Route path="overview" element={<Overview />} />
+          <Route path="checkin-checkout" element={<CheckInCheckOut />} />
+          <Route path="qrscan" element={<QrScan />} />
+          <Route path="attendance" element={<Attendance />} />
+        </Route>
 
-        </Routes>
-      </BrowserRouter>
-    </>
+        {/* ---------------- FALLBACK ---------------- */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;
