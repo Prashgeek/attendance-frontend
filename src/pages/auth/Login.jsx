@@ -1,7 +1,9 @@
 
+// frontend/src/pages/auth/Login.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../../api/users';
+import Login2FA from '../../components/Login2FA';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,6 +16,11 @@ export default function Login() {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 2FA state
+  const [twoFAPending, setTwoFAPending] = useState(false);
+  const [tempToken, setTempToken] = useState(null);
+  const [setupData, setSetupData] = useState(null); // <-- NEW: store setup info (qr + backup codes)
 
   const GENERIC_ERROR = 'Login failed. Please check your credentials and try again.';
 
@@ -46,41 +53,82 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // Note: login() posts to /api/auth/login
       const res = await login({
         email: form.email.trim(),
         password: form.password,
         selectedRole: form.role
       });
 
-      if (res && res.data && res.data.user) {
-        // If backend returns a user but role doesn't match, show generic message
-        if (res.data.user.role !== form.role) {
+      const data = res?.data;
+
+      // If backend indicates 2FA is required:
+      if (data?.twoFARequired || data?.twoFASetupRequired) {
+        setTwoFAPending(true);
+        setTempToken(data.tempToken || null);
+
+        // store optional setup data (QR + backup codes) to show in 2FA UI
+        if (data.setup) {
+          setSetupData(data.setup);
+        } else {
+          setSetupData(null);
+        }
+
+        setLoading(false);
+        return;
+      }
+
+      if (data && data.user) {
+        // Role mismatch check
+        if (data.user.role !== form.role) {
           setError(GENERIC_ERROR);
           setLoading(false);
           return;
         }
 
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        
-        // Navigate based on role
-        if (res.data.user.role === 'admin') {
-          navigate('/admin', { replace: true });
-        } else if (res.data.user.role === 'teacher') {
-          navigate('/teacher', { replace: true });
-        } else if (res.data.user.role === 'student') {
-          navigate('/student', { replace: true });
-        }
+        // Successful login (no 2FA required)
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        if (data.user.role === 'admin') navigate('/admin', { replace: true });
+        else if (data.user.role === 'teacher') navigate('/teacher', { replace: true });
+        else navigate('/student', { replace: true });
       } else {
         setError(GENERIC_ERROR);
       }
     } catch (err) {
       console.error('Login error:', err);
-      // Always show generic message (do not reveal specifics)
       setError(GENERIC_ERROR);
     } finally {
       setLoading(false);
     }
   };
+
+  // callback when 2FA verification succeeded
+  const handle2FASuccess = (user) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    // navigate by role
+    if (user.role === 'admin') navigate('/admin', { replace: true });
+    else if (user.role === 'teacher') navigate('/teacher', { replace: true });
+    else navigate('/student', { replace: true });
+  };
+
+  if (twoFAPending) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white p-4">
+        <Login2FA
+          email={form.email}
+          tempToken={tempToken}
+          setup={setupData}        // <-- PASS setup here
+          onSuccess={handle2FASuccess}
+          onBack={() => {
+            setTwoFAPending(false);
+            setTempToken(null);
+            setSetupData(null);
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-white p-4">
@@ -109,10 +157,6 @@ export default function Login() {
 
           <label htmlFor="email" className="block text-sm font-medium mb-1 text-gray-700">Email</label>
           <div className="relative mb-3">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 stroke-gray-500" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 8l9 6 9-6" />
-              <rect x="3" y="6" width="18" height="12" rx="2" ry="2" />
-            </svg>
             <input
               id="email"
               name="email"
@@ -122,17 +166,12 @@ export default function Login() {
               required
               value={form.email}
               onChange={handleChange}
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
 
           <label htmlFor="password" className="block text-sm font-medium mb-1 text-gray-700">Password</label>
           <div className="relative mb-3">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 stroke-gray-500" viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" xmlns="http://www.w3.org/2000/svg">
-              <rect x="5" y="11" width="14" height="9" rx="2" ry="2" />
-              <path d="M12 16v2" />
-              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-            </svg>
             <input
               id="password"
               name="password"
@@ -142,7 +181,7 @@ export default function Login() {
               required
               value={form.password}
               onChange={handleChange}
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-3 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
           </div>
 

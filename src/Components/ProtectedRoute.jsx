@@ -1,4 +1,5 @@
- // src/components/ProtectedRoute.jsx
+
+// src/components/ProtectedRoute.jsx
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 

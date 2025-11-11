@@ -1,3 +1,4 @@
+
 // src/App.jsx
 import React, { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -20,12 +21,12 @@ import CheckInCheckOut from "./pages/Student/CheckInCheckOut";
 import QrScan from "./pages/Student/QrScan";
 import Attendance from "./pages/Student/Attendance";
 
-// ====================== Teacher Imports ======================
-import Header from "./pages/Teacher/Teacher_components/Header";
-import Navbar from "./pages/Teacher/Teacher_components/Navbar";
-import MarkAttendance from "./pages/Teacher/Teacher_components/MarkAttendance";
-import MyClasses from "./pages/Teacher/Teacher_components/MyClasses";
-import History from "./pages/Teacher/Teacher_components/History";
+// ====================== Teacher Imports (✅ fixed paths) ======================
+import Header from "./Components/Teacher_components/Header";
+import Navbar from "./Components/Teacher_components/Navbar";
+import MarkAttendance from "./Components/Teacher_components/MarkAttendance";
+import MyClasses from "./Components/Teacher_components/MyClasses";
+import History from "./Components/Teacher_components/History";
 
 // ====================== Protected Route ======================
 import ProtectedRoute from "./components/ProtectedRoute";

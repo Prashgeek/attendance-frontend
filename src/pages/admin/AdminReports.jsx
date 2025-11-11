@@ -1,7 +1,70 @@
-import React, { useRef, useState } from "react";
+
+// frontend/src/pages/admin/AdminReports.jsx
+import React, { useRef, useState, useEffect } from "react";
+import api from "../../api/config"; // ✅ Change 1: Use API config instead of axios
 
 export default function Reports() {
   const scrollRef = useRef(null);
+
+  const [allData, setAllData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [users, setUsers] = useState([]); // ✅ This will store actual users from API
+  const [loading, setLoading] = useState(false);
+  const [totals, setTotals] = useState({
+    present: 0, late: 0, absent: 0, total: 0, attendanceRate: 0
+  });
+
+  useEffect(() => {
+    // load users and initial report data
+    (async () => {
+      try {
+        setLoading(true);
+        // ✅ Change 2: Use api instead of axios
+        const [usersRes, reportsRes] = await Promise.all([
+          api.get('/users'),
+          api.get('/reports?limit=1000')
+        ]);
+        
+        // ✅ Change 3: Store actual users from API
+        if (usersRes.data && usersRes.data.users) {
+          setUsers(usersRes.data.users);
+          console.log('📊 Users loaded:', usersRes.data.users);
+        }
+        
+        if (reportsRes.data && reportsRes.data.records) {
+          setAllData(reportsRes.data.records);
+          setFilteredData(reportsRes.data.records);
+          setTotals(reportsRes.data.aggregates || totals);
+        }
+      } catch (err) {
+        console.error('Error loading reports/users', err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const fetchReports = async (filtersObj = {}) => {
+    try {
+      setLoading(true);
+      const params = {
+        limit: 2000,
+        ...filtersObj
+      };
+      // ✅ Change 4: Use api instead of axios
+      const res = await api.get('/reports', { params });
+      if (res.data && res.data.success) {
+        setAllData(res.data.records || []);
+        setFilteredData(res.data.records || []);
+        setTotals(res.data.aggregates || {});
+      }
+    } catch (err) {
+      console.error('fetchReports', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [exportLoading, setExportLoading] = useState({
     pdf: false,
     excel: false,
@@ -14,38 +77,27 @@ export default function Reports() {
     toDate: ""
   });
 
-  // Sample data
-  const allData = [
-    { id: 1, date: "1/10/2025", name: "Sarah Johnson", status: "present", checkIn: "09:20", checkOut: "16:28", hours: "7.1h" },
-    { id: 2, date: "1/10/2025", name: "Michael Brown", status: "present", checkIn: "09:09", checkOut: "16:09", hours: "7.0h" },
-    { id: 3, date: "1/10/2025", name: "Emily Davis", status: "late", checkIn: "10:43", checkOut: "15:43", hours: "5.0h" },
-    { id: 4, date: "1/10/2025", name: "David Wilson", status: "present", checkIn: "09:59", checkOut: "17:04", hours: "7.1h" },
-    { id: 5, date: "1/10/2025", name: "Lisa Anderson", status: "present", checkIn: "08:39", checkOut: "16:44", hours: "8.1h" },
-    { id: 6, date: "1/10/2025", name: "Robert Taylor", status: "present", checkIn: "09:55", checkOut: "16:52", hours: "7.0h" },
-    { id: 7, date: "1/10/2025", name: "Jennifer Martinez", status: "present", checkIn: "08:54", checkOut: "16:10", hours: "7.3h" },
-    { id: 8, date: "1/10/2025", name: "James Garcia", status: "present", checkIn: "08:35", checkOut: "15:42", hours: "7.1h" },
-    { id: 9, date: "2/10/2025", name: "Sarah Johnson", status: "present", checkIn: "09:10", checkOut: "17:07", hours: "8.0h" },
-    { id: 10, date: "2/10/2025", name: "Michael Brown", status: "absent", checkIn: "-", checkOut: "-", hours: "0h" },
-    { id: 11, date: "2/10/2025", name: "Emily Davis", status: "late", checkIn: "10:15", checkOut: "16:30", hours: "6.3h" },
-    { id: 12, date: "2/10/2025", name: "David Wilson", status: "present", checkIn: "09:00", checkOut: "17:00", hours: "8.0h" },
-  ];
-
   // Filter data based on current filters
-  const filteredData = allData.filter(item => {
-    if (filters.user !== "all" && item.name !== getUserName(filters.user)) return false;
-    if (filters.status !== "all" && item.status !== filters.status) return false;
-    if (filters.fromDate) {
-      const itemDate = new Date(item.date);
-      const fromDate = new Date(filters.fromDate);
-      if (itemDate < fromDate) return false;
-    }
-    if (filters.toDate) {
-      const itemDate = new Date(item.date);
-      const toDate = new Date(filters.toDate);
-      if (itemDate > toDate) return false;
-    }
-    return true;
-  });
+  useEffect(() => {
+    const filtered = allData.filter(item => {
+      if (filters.user !== "all" && item.userId !== filters.user) return false;
+      if (filters.status !== "all" && item.status !== filters.status) return false;
+      
+      if (filters.fromDate) {
+        const itemDate = new Date(item.date);
+        const fromDate = new Date(filters.fromDate);
+        if (itemDate < fromDate) return false;
+      }
+      if (filters.toDate) {
+        const itemDate = new Date(item.date);
+        const toDate = new Date(filters.toDate);
+        if (itemDate > toDate) return false;
+      }
+      return true;
+    });
+    
+    setFilteredData(filtered);
+  }, [filters, allData]);
 
   // Calculate statistics from filtered data
   const statistics = {
@@ -58,16 +110,18 @@ export default function Reports() {
       : "0.0"
   };
 
+  // ✅ Change 5: Get user name from state instead of hardcoded object
   function getUserName(userId) {
-    const users = {
-      "all": "All Users",
-      "user1": "Sarah Johnson",
-      "user2": "Michael Brown", 
-      "user3": "Emily Davis",
-      "user4": "David Wilson",
-      "user5": "Lisa Anderson"
-    };
-    return users[userId];
+    if (userId === "all") return "All Users";
+    
+    // Find user from actual users array
+    const user = users.find((u) => String(u.id) === String(userId));
+    
+    if (user) {
+      return user.fullName || user.email || "Unknown User";
+    }
+    
+    return "Unknown User";
   }
 
   function handleFilterChange(key, value) {
@@ -79,7 +133,7 @@ export default function Reports() {
 
   // Function to get current date for filename
   const getCurrentDate = () => {
-    return new Date().toISOString().split('T')[0];
+    return new Date().toISOString().split('T');
   };
 
   // Fixed PDF Export with proper PDF generation
@@ -208,7 +262,7 @@ ${pdfContent.length}
     }
   };
 
-  // Enhanced Excel Export with animations
+  // Enhanced Excel Export with animations - FIXED VERSION
   const handleExportExcel = async () => {
     setExportLoading(prev => ({ ...prev, excel: true }));
     
@@ -300,6 +354,15 @@ Generated on: ${new Date().toLocaleDateString()}`;
     }
   };
 
+  const applyFilters = () => {
+    const params = {};
+    if (filters.user && filters.user !== 'all') params.user = filters.user;
+    if (filters.status && filters.status !== 'all') params.status = filters.status;
+    if (filters.fromDate) params.fromDate = filters.fromDate;
+    if (filters.toDate) params.toDate = filters.toDate;
+    fetchReports(params);
+  };
+
   // Loading spinner component
   const LoadingSpinner = () => (
     <div className="animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 w-4 h-4"></div>
@@ -323,11 +386,12 @@ Generated on: ${new Date().toLocaleDateString()}`;
                 className="w-full rounded-2xl p-2.5 bg-gray-50 border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-400"
               >
                 <option value="all">All Users</option>
-                <option value="user1">Sarah Johnson</option>
-                <option value="user2">Michael Brown</option>
-                <option value="user3">Emily Davis</option>
-                <option value="user4">David Wilson</option>
-                <option value="user5">Lisa Anderson</option>
+                {/* ✅ Change 6: Map actual users from state instead of hardcoded options */}
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.fullName || user.email}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -500,7 +564,7 @@ Generated on: ${new Date().toLocaleDateString()}`;
         </div>
 
         <div id="footer-note" className="text-center text-sm text-gray-500 mt-4" aria-live="polite">
-          Showing {filteredData.length} of {allData.length} records. Export for full data.
+          Showing { (filteredData || []).length } of { (totals.total || (allData||[]).length) } records. Export for full data.
         </div>
       </div>
     </section>

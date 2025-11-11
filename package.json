@@ -12,6 +12,8 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.16",
     "chart.js": "^4.5.1",
+    "lucide-react": "^0.553.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-calendar": "^6.0.0",
     "react-chartjs-2": "^5.3.1",
